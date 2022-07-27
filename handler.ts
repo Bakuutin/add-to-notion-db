@@ -13,11 +13,10 @@ interface Event {
 const TITLE_LIMIT = 1500
 
 
-async function appendParagraph(pageId: string, text: string) {
+async function appendParagraphs(pageId: string, ...texts: string[]) {
   await notion.blocks.children.append({
     block_id: pageId,
-    children: [
-      {
+    children: texts.map(text => ({
         type: "paragraph",
         object: "block",
         paragraph: {
@@ -28,8 +27,7 @@ async function appendParagraph(pageId: string, text: string) {
             },
           ],
         },
-      },
-    ],
+      })),
   })
 }
 
@@ -55,9 +53,7 @@ export const main: APIGatewayProxyHandler = async event => {
     // split paragraph onto blocks of max 1500 characters
     const paragraphs = text.split('\n').map(paragraph => paragraph.match(/.{1,1500}/g) || ['']).flat()
 
-    for (let paragraph of paragraphs) {
-      await appendParagraph(pageId, paragraph)
-    }
+    await appendParagraphs(pageId, ...paragraphs)
   }
 
   return {
