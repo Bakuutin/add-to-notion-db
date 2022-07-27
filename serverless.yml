@@ -1,0 +1,13 @@
+service: add-to-notion-db
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+functions:
+  hello:
+    handler: handler.main
+
+plugins:
+  - serverless-esbuild
