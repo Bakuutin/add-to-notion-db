@@ -6,8 +6,16 @@ provider:
   runtime: nodejs16.x
 
 functions:
-  hello:
+  main:
     handler: handler.main
-
+    environment:
+      NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
+      NOTION_DATABASE_ID: ${file(./config.yaml):NOTION_DATABASE_ID}
+    events:
+      - http:
+          path: /
+          method: post
+          cors: false
+          private: false
 plugins:
   - serverless-esbuild

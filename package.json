@@ -1,7 +1,12 @@
 {
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.101",
     "esbuild": "^0.14.25",
     "serverless-esbuild": "^1.25.0"
   },
-  "name": "add-to-notion-db"
+  "name": "add-to-notion-db",
+  "dependencies": {
+    "@notionhq/client": "^2.1.0",
+    "aws-sdk": "^2.1182.0"
+  }
 }
