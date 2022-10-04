@@ -10,7 +10,7 @@ interface Event {
   text: string;
 }
 
-const TITLE_LIMIT = 1500
+const TITLE_LIMIT = 150
 
 
 async function appendParagraphs(pageId: string, ...texts: string[]) {
@@ -40,16 +40,16 @@ async function createPage(title: string) {
   return id
 }
 
+const URLExpr = new RegExp(/https?:\/\/\S+/gui);
+
 
 export const main: APIGatewayProxyHandler = async event => {
   let { text }: Event = JSON.parse(event.body || '') || {}
 
-
   const title = text ? text.slice(0, TITLE_LIMIT) : new Date().toString();
   const pageId = await createPage(title)
 
-
-  if (text.length > TITLE_LIMIT) {
+  if (text.length > TITLE_LIMIT || URLExpr.test(text)) {
     // split paragraph onto blocks of max 1500 characters
     const paragraphs = text.split('\n').map(paragraph => paragraph.match(/.{1,1500}/g) || ['']).flat()
 
