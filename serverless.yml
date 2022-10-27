@@ -4,6 +4,7 @@ frameworkVersion: '3'
 provider:
   name: aws
   runtime: nodejs16.x
+  timeout: 30
 
 functions:
   main:

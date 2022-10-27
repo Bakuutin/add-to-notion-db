@@ -2,7 +2,7 @@ export const RULES: Rule[] = [
     { tag: 'Inbox', rule: () => true },
     { tag: 'Wishlist', rule: 'wishlist|вишлист|хочу|want' },
     { tag: 'Actionable', rule: 'todo|делать' },
-    { tag: 'To Watch', rule: 'read|читать|book|книга|фильм|movie|series|сериал|подкаст|podcast|советует|смотреть' },
+    { tag: 'To Watch', rule: 'watch|read|читать|book|книга|фильм|movie|series|сериал|подкаст|podcast|советует|смотреть' },
     { tag: 'Anki', rule: 'anki|анки|колода|deck' },
     { tag: 'Shower thoughts', rule: /(^|\s)?(хм+|hm+)/mui },
     { tag: 'Article Ideas', rule: 'пост|article' },

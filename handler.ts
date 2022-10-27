@@ -186,7 +186,7 @@ export const main: APIGatewayProxyHandler = async event => {
 
   text = text.trim()
 
-  const tagNames = rules.map(rule => rule.tag)
+  const tagNames = extractTagNames(text)
 
   const tagIds = await Promise.all(tagNames.map(getOrCreateTagId))
 
