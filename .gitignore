@@ -3,6 +3,7 @@ node_modules
 .esbuild
 
 config.yaml
+rules.ts
 
 # Serverless directories
 .serverless

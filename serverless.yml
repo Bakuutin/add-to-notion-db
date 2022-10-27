@@ -10,7 +10,8 @@ functions:
     handler: handler.main
     environment:
       NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
-      NOTION_DATABASE_ID: ${file(./config.yaml):NOTION_DATABASE_ID}
+      ITEMS_DATABASE_ID: ${file(./config.yaml):ITEMS_DATABASE_ID}
+      TAG_DATABASE_ID: ${file(./config.yaml):TAG_DATABASE_ID}
     events:
       - http:
           path: /

@@ -32,5 +32,5 @@ Note: Keep your url in secret!
 
 ## Roadmap
 
-- Auto-set tags based on regexp from config
-- Upload files to S3, attach files to the page
+- [x] Auto-set tags based on regexp from config
+- [ ] Upload files to S3, attach files to the page
