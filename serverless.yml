@@ -5,6 +5,18 @@ provider:
   name: aws
   runtime: nodejs16.x
   timeout: 30
+  region: us-east-1
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/tagTable"
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/tagTable/index/*"
 
 functions:
   main:
@@ -19,5 +31,37 @@ functions:
           method: post
           cors: false
           private: false
+
 plugins:
   - serverless-esbuild
+  - serverless-dynamodb-local
+
+resources:
+  Resources:
+    tagTable:
+      # TODO: add ttl
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: tagTable
+        AttributeDefinitions:
+          - AttributeName: name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: name
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+custom:
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      heapInitial: 200m
+      heapMax: 1g
+      migrate: true
+      seed: true
+      convertEmptyValues: true

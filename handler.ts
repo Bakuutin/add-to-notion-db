@@ -1,8 +1,9 @@
 import { Client } from "@notionhq/client";
-import { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { parse as parseHTML } from 'node-html-parser';
+
+import AWS from "aws-sdk";
 
 import Axios from "axios";
 
@@ -30,45 +31,90 @@ try {
 }
 
 
+const dynamoDbClientParams: Record<string, any> = {}
+if (process.env.IS_LOCAL) {
+  dynamoDbClientParams.region = 'localhost'
+  dynamoDbClientParams.endpoint = 'http://localhost:8000'
+}
+const dynamo = new AWS.DynamoDB.DocumentClient(dynamoDbClientParams);
+
+
+
 async function getOrCreateTagId(name: string): Promise<string> {
-    if (TAG_MAP.size === 0) {
-        await fetchTags()
-    }
+  if (TAG_MAP.size === 0) {
+    await fetchTags()
+  }
 
-    let cachedId = TAG_MAP.get(name)
+  let cachedId = TAG_MAP.get(name)
 
-    if (cachedId) {
-        return cachedId
-    }
+  if (cachedId) {
+    return cachedId
+  }
 
-    let { id } = await notion.pages.create({
-        parent: { database_id: process.env.TAG_DATABASE_ID as string },
-        properties: {
-            Name: { title: [{ text: { content: name } }] },
-        },
-    })
+  let { id } = await notion.pages.create({
+    parent: { database_id: process.env.TAG_DATABASE_ID as string },
+    properties: {
+      Name: { title: [{ text: { content: name } }] },
+    },
+  })
 
-    return id
+  return id
 }
 
 async function fetchTags() {
+  TAG_MAP.clear()
+
+  try {
+    const { Items } = await dynamo.scan({ TableName: 'tagTable' }).promise()
+
+
+    if (Items) {
+      for (let item of Items) {
+        TAG_MAP.set(item.name, item.id)
+      }
+    }
+  } catch (e) {
+    console.log('Failed to fetch tags from dynamodb, fallback to notion')
+  }
+
+  const newTags = Array.from(new Set(rules.filter(rule => !TAG_MAP.has(rule.tag))))
+
+
+  console.log({newTags})
+
+  if (newTags.length > 0) {
+
     const resp: any = await notion.databases.query({
-        database_id: process.env.TAG_DATABASE_ID as string,
-        filter: {
-            or: rules.map(rule => ({
-                    property: 'Name',
-                    title: {
-                        equals: rule.tag
-                    },
-                })
-            )
-        },
+      database_id: process.env.TAG_DATABASE_ID as string,
+      filter: {
+        or: newTags.map(rule => ({
+          property: 'Name',
+          title: {
+            equals: rule.tag
+          },
+        })
+        )
+      },
     })
 
-    TAG_MAP.clear()
-    for(let tag of resp.results) {
-        TAG_MAP.set(tag.properties.Name.title[0].text.content, tag.id)
+    for (let tag of resp.results) {
+      TAG_MAP.set(tag.properties.Name.title[0].text.content, tag.id)
     }
+
+    await dynamo.batchWrite({
+      RequestItems: {
+        tagTable: newTags.map(rule => ({
+          PutRequest: {
+            Item: {
+              name: rule.tag,
+              id: TAG_MAP.get(rule.tag) as string,
+            }
+          }
+        })
+        )
+      }
+    }).promise()
+  }
 }
 
 
@@ -76,17 +122,17 @@ async function appendParagraphs(pageId: string, ...texts: string[]) {
   await notion.blocks.children.append({
     block_id: pageId,
     children: texts.map(text => ({
-        type: "paragraph",
-        object: "block",
-        paragraph: {
-          rich_text: [
-            {
-              type: "text",
-              text: { "content": text },
-            },
-          ],
-        },
-      })),
+      type: "paragraph",
+      object: "block",
+      paragraph: {
+        rich_text: [
+          {
+            type: "text",
+            text: { "content": text },
+          },
+        ],
+      },
+    })),
   })
 }
 
@@ -141,8 +187,8 @@ async function getTitle(text: string): Promise<string> {
       if (title) {
         return title
       }
-    } catch (e) {}
-  } else if(text) {
+    } catch (e) { }
+  } else if (text) {
     return text.slice(0, TITLE_LIMIT)
   }
   return "Untitled"
