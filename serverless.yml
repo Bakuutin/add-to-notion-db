@@ -1,5 +1,5 @@
 service: add-to-notion-db
-frameworkVersion: '3'
+frameworkVersion: "3"
 
 provider:
   name: aws
@@ -17,24 +17,29 @@ provider:
           Action:
             - dynamodb:*
           Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/tagTable/index/*"
+  environment:
+    NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
+    ITEMS_DATABASE_ID: ${file(./config.yaml):ITEMS_DATABASE_ID}
+    TAG_DATABASE_ID: ${file(./config.yaml):TAG_DATABASE_ID}
 
 functions:
   main:
-    handler: handler.main
-    environment:
-      NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
-      ITEMS_DATABASE_ID: ${file(./config.yaml):ITEMS_DATABASE_ID}
-      TAG_DATABASE_ID: ${file(./config.yaml):TAG_DATABASE_ID}
+    handler: src/webhook.onHttpRequest
     events:
       - http:
           path: /
           method: post
           cors: false
           private: false
+  alexaSkill:
+    handler: src/alexa.onAlexaInvocation
+    events:
+      - alexaSkill:
+          appId: ${file(./config.yaml):ALEXA_SKILL_ID}
+          enabled: true
 
 plugins:
   - serverless-esbuild
-  - serverless-dynamodb-local
 
 resources:
   Resources:
@@ -52,16 +57,3 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
-
-custom:
-  dynamodb:
-    stages:
-      - dev
-    start:
-      port: 8000
-      inMemory: true
-      heapInitial: 200m
-      heapMax: 1g
-      migrate: true
-      seed: true
-      convertEmptyValues: true

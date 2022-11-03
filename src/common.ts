@@ -1,20 +1,14 @@
 import { Client } from "@notionhq/client";
 
-import { APIGatewayProxyHandler } from "aws-lambda";
 import { parse as parseHTML } from 'node-html-parser';
 
 import AWS from "aws-sdk";
 
 import Axios from "axios";
 
-// Initializing a client
 const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 })
-
-interface Event {
-  text: string;
-}
 
 const TITLE_LIMIT = 100
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
@@ -31,13 +25,7 @@ try {
 }
 
 
-const dynamoDbClientParams: Record<string, any> = {}
-if (process.env.IS_LOCAL) {
-  dynamoDbClientParams.region = 'localhost'
-  dynamoDbClientParams.endpoint = 'http://localhost:8000'
-}
-const dynamo = new AWS.DynamoDB.DocumentClient(dynamoDbClientParams);
-
+const dynamo = new AWS.DynamoDB.DocumentClient();
 
 
 async function getOrCreateTagId(name: string): Promise<string> {
@@ -227,9 +215,7 @@ function extractTagNames(text: string): string[] {
 }
 
 
-export const main: APIGatewayProxyHandler = async event => {
-  let { text }: Event = JSON.parse(event.body || '') || {}
-
+export const processText = async (text: string): Promise<{pageId: string, title: string}> => {
   text = text.trim()
 
   const tagNames = extractTagNames(text)
@@ -265,8 +251,5 @@ export const main: APIGatewayProxyHandler = async event => {
     await appendParagraphs(pageId, ...paragraphs)
   }
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ pageId, title }),
-  };
+  return { pageId, title }
 }
