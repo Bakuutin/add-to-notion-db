@@ -6,7 +6,7 @@ import AWS from "aws-sdk";
 
 import Axios from "axios";
 
-const notion = new Client({
+export const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 })
 
@@ -28,7 +28,7 @@ try {
 const dynamo = new AWS.DynamoDB.DocumentClient();
 
 
-async function getOrCreateTagId(name: string): Promise<string> {
+export const getOrCreateTagId = async (name: string): Promise<string> => {
   if (TAG_MAP.size === 0) {
     await fetchTags()
   }
@@ -66,9 +66,6 @@ async function fetchTags() {
   }
 
   const newTags = Array.from(new Set(rules.filter(rule => !TAG_MAP.has(rule.tag))))
-
-
-  console.log({newTags})
 
   if (newTags.length > 0) {
 
