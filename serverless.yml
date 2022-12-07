@@ -50,6 +50,9 @@ functions:
           method: post
           cors: false
           private: false
+    environment:
+      TG_BOT_TOKEN: ${file(./config.yaml):TG_BOT_TOKEN}
+      DEBUG: 'telegraf:*'
 
 plugins:
   - serverless-esbuild

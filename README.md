@@ -26,6 +26,12 @@ Deployment is pretty straightforward
 
 ```bash
 serverless deploy
+
+curl \
+ --request POST \
+ --url https://api.telegram.org/bot${TOKEN}/setWebhook \
+ --header 'content-type: application/json' \
+ --data "{\"url\": \"${endpoint}\"}"
 ```
 
 Note: Keep your url in secret!
