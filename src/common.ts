@@ -6,6 +6,8 @@ import AWS from "aws-sdk";
 
 import Axios from "axios";
 
+import { v4 as uuidv4 } from 'uuid';
+
 export const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 })
@@ -248,5 +250,34 @@ export const processText = async (text: string): Promise<{pageId: string, title:
     await appendParagraphs(pageId, ...paragraphs)
   }
 
+  return { pageId, title }
+}
+
+
+export const uploadToS3 = async (filename: string, contentType: string, content: Buffer) => {
+  const s3 = new AWS.S3()
+  const key = `uploads/${uuidv4()}/${filename}`
+
+  await s3.putObject({
+    Bucket: process.env.S3_BUCKET as string,
+    Key: key,
+    Body: content,
+    ContentType: contentType,
+    ACL: 'public-read'
+  }).promise()
+
+  return `https://${process.env.S3_BUCKET}.s3.amazonaws.com/${key}`
+}
+
+export const addFilesToPage = async (pageID: string, fileUrls: string[]): Promise<void> => {
+  await notion.blocks.children.append({
+    block_id: pageID,
+    children: fileUrls.map(url => ({file: { external: { url } }})),
+  })
+}
+
+export const processTextAndFiles = async (text: string, fileUrls: string[]): Promise<{pageId: string, title: string}> => {
+  const { pageId, title } = await processText(text)
+  await addFilesToPage(pageId, fileUrls)
   return { pageId, title }
 }

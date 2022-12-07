@@ -17,10 +17,15 @@ provider:
           Action:
             - dynamodb:*
           Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/tagTable/index/*"
+        - Effect: Allow # allow s3 write
+          Action:
+            - s3:PutObject
+          Resource: "arn:aws:s3:::*/*"
   environment:
     NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
     ITEMS_DATABASE_ID: ${file(./config.yaml):ITEMS_DATABASE_ID}
     TAG_DATABASE_ID: ${file(./config.yaml):TAG_DATABASE_ID}
+    S3_BUCKET: ${file(./config.yaml):S3_BUCKET}
 
 functions:
   main:
@@ -37,6 +42,14 @@ functions:
       - alexaSkill:
           appId: ${file(./config.yaml):ALEXA_SKILL_ID}
           enabled: true
+  telegramBot:
+    handler: src/telegram.handler
+    events:
+      - http:
+          path: telegram
+          method: post
+          cors: false
+          private: false
 
 plugins:
   - serverless-esbuild
@@ -44,7 +57,6 @@ plugins:
 resources:
   Resources:
     tagTable:
-      # TODO: add ttl
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: tagTable
@@ -57,3 +69,18 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
+
+    s3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${file(./config.yaml):S3_BUCKET}
+        AccessControl: PublicRead
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+              AllowedOrigins:
+                - '*'
+              MaxAge: 0

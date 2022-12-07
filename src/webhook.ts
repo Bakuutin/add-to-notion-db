@@ -1,6 +1,8 @@
-import { APIGatewayProxyHandler } from "aws-lambda";
+import { APIGatewayProxyEvent, APIGatewayProxyHandler } from "aws-lambda";
 
-import { processText, getOrCreateTagId, notion } from "./common";
+import { processText, getOrCreateTagId, notion, uploadToS3, processTextAndFiles } from "./common";
+
+import { parse as parseForm } from 'lambda-multipart-parser'
 
 
 /**
@@ -57,8 +59,42 @@ const ACTIONS = {
 const DEFAULT_ACTION = 'addEntry'
 
 
-export const onHttpRequest: APIGatewayProxyHandler = async event => {
-  const data = JSON.parse(event.body || '') || {}
+export const onJSON = async (data: any) => {
   const handler = ACTIONS[data.action || DEFAULT_ACTION]
   return await handler(data)
+}
+
+export const onHttpRequest: APIGatewayProxyHandler = async event => {
+  const contentType = event.headers['content-type'] || ''
+
+  if (contentType.startsWith('application/json')) {
+    const data = JSON.parse(event.body || '') || {}
+    return await onJSON(data)
+  }
+
+  if (contentType.startsWith('text/plain')) {
+    const text = event.body || ''
+    return await onJSON({ text })
+  }
+
+  if (contentType.startsWith('multipart/form-data')) {
+    return await onFormData(event)
+  }
+}
+
+/**
+ * Upload file to S3 and add it to Notion
+ */
+export const onFormData = async (event: APIGatewayProxyEvent) => {
+  let { files, text } = await parseForm(event)
+
+  const fileUrls = await Promise.all(files.map(async ({ filename, contentType, content }) => {
+    return await uploadToS3(filename, contentType, content)
+  }))
+
+  if (!text) {
+    text = files.map(file => file.filename).join(' ')
+  }
+
+  return await processTextAndFiles(text, fileUrls)
 }
