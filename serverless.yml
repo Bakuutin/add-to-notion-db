@@ -19,8 +19,8 @@ provider:
           Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/tagTable/index/*"
         - Effect: Allow # allow s3 write
           Action:
-            - s3:PutObject
-          Resource: "arn:aws:s3:::*/*"
+            - s3:*
+          Resource: "arn:aws:s3:::${file(./config.yaml):S3_BUCKET}/*"
   environment:
     NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
     ITEMS_DATABASE_ID: ${file(./config.yaml):ITEMS_DATABASE_ID}

@@ -6,6 +6,10 @@ import AWS from "aws-sdk";
 
 import Axios from "axios";
 
+import { fileTypeFromBuffer } from 'file-type';
+
+import slugify from "slugify";
+
 import { v4 as uuidv4 } from 'uuid';
 
 export const notion = new Client({
@@ -214,7 +218,7 @@ function extractTagNames(text: string): string[] {
 }
 
 
-export const processText = async (text: string): Promise<{pageId: string, title: string}> => {
+export const processText = async (text: string): Promise<{ pageId: string, title: string }> => {
   text = text.trim()
 
   const tagNames = extractTagNames(text)
@@ -254,9 +258,24 @@ export const processText = async (text: string): Promise<{pageId: string, title:
 }
 
 
-export const uploadToS3 = async (filename: string, contentType: string, content: Buffer) => {
+export interface UploadedFile {
+  url: string
+  filename: string
+  contentType: string
+}
+
+export const uploadToS3 = async (filename: string, contentType: string, content: Buffer): Promise<UploadedFile> => {
   const s3 = new AWS.S3()
-  const key = `uploads/${uuidv4()}/${filename}`
+  let { ext } = await fileTypeFromBuffer(content) || {}
+
+  if (ext === 'opus') {
+    ext = 'ogg'
+  }
+
+  if (ext && !filename.endsWith(ext)) {
+    filename += `.${ext}`
+  }
+  const key = `uploads/${uuidv4()}/${slugify(filename)}`
 
   await s3.putObject({
     Bucket: process.env.S3_BUCKET as string,
@@ -266,18 +285,33 @@ export const uploadToS3 = async (filename: string, contentType: string, content:
     ACL: 'public-read'
   }).promise()
 
-  return `https://${process.env.S3_BUCKET}.s3.amazonaws.com/${key}`
+  const url = `https://${process.env.S3_BUCKET}.s3.amazonaws.com/${key}`
+
+  return { url, filename, contentType }
 }
 
-export const addFilesToPage = async (pageID: string, fileUrls: string[]): Promise<void> => {
-  await notion.blocks.children.append({
+export const addFilesToPage = async (pageID: string, files: UploadedFile[]): Promise<void> => {
+  const data = {
     block_id: pageID,
-    children: fileUrls.map(url => ({file: { external: { url } }})),
-  })
+    children: files.map(file => {
+      switch (file.contentType.split('/')[0]) {
+        case 'image':
+          return { image: { external: { url: file.url } } }
+        case 'video':
+          return { video: { external: { url: file.url } } }
+        case 'audio':
+          return { audio: { external: { url: file.url } } }
+        default:
+          return { file: { external: { url: file.url } } }
+      }
+    }),
+  }
+
+  await notion.blocks.children.append(data)
 }
 
-export const processTextAndFiles = async (text: string, fileUrls: string[]): Promise<{pageId: string, title: string}> => {
+export const processTextAndFiles = async (text: string, files: UploadedFile[]): Promise<{ pageId: string, title: string }> => {
   const { pageId, title } = await processText(text)
-  await addFilesToPage(pageId, fileUrls)
+  await addFilesToPage(pageId, files)
   return { pageId, title }
 }
