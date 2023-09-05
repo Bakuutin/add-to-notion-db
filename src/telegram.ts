@@ -4,18 +4,23 @@ import { message } from "telegraf/filters";
 import Axios from "axios";
 
 import { processText, processTextAndFiles, uploadToS3 } from "./common";
+import { transcribe } from "./openai";
 
 const bot = new Telegraf(process.env.TG_BOT_TOKEN!);
 
 
-const processTgFileId = async (ctx: any, fileId: string, filename: string, contentType: string, text: string) => {
-    const postfix = getForwardedPostfix(ctx)
+const saveTgFileById = async (fileId: string, filename: string, contentType: string) => {
     const tgFileUrl = await bot.telegram.getFileLink(fileId)
     const resp = await Axios.get<ArrayBuffer>(tgFileUrl.href, { responseType: 'arraybuffer' })
+    const uploaded = await uploadToS3(filename, contentType, Buffer.from(resp.data))
+    return { uploaded, resp }
+}
 
+const processTgFileIdAndReply = async (ctx: any, fileId: string, filename: string, contentType: string, text: string) => {
+    const { uploaded } = await saveTgFileById(fileId, filename, contentType)
 
-    const file = await uploadToS3(filename, contentType, Buffer.from(resp.data))
-    const { title } = await processTextAndFiles(postfix ? `${text} ${postfix}` : text, [file])
+    const postfix = getForwardedPostfix(ctx)
+    const { title } = await processTextAndFiles(postfix ? `${text} ${postfix}` : text, [uploaded])
 
     ctx.reply(`Got it!\n\n${title}`)
 }
@@ -52,14 +57,12 @@ const getForwardedPostfix = (ctx: any) => {
 }
 
 
-
-
 bot.on(message('document'), async ctx => {
     const filename = ctx.message.document.file_name || 'file'
     const text = ctx.message.caption || filename
     const postfix = getForwardedPostfix(ctx)
     const contentType = ctx.message.document.mime_type || 'application/octet-stream'
-    await processTgFileId(ctx, ctx.message.document.file_id, filename, contentType, postfix ? `${text} ${postfix}` : text)
+    await processTgFileIdAndReply(ctx, ctx.message.document.file_id, filename, contentType, postfix ? `${text} ${postfix}` : text)
 });
 
 bot.on(message('photo'), async ctx => {
@@ -69,7 +72,7 @@ bot.on(message('photo'), async ctx => {
 
     const photo = ctx.message.photo[ctx.message.photo.length - 1]
 
-    await processTgFileId(ctx, photo.file_id, filename, contentType, text)
+    await processTgFileIdAndReply(ctx, photo.file_id, filename, contentType, text)
 });
 
 bot.on(message('video'), async ctx => {
@@ -77,7 +80,7 @@ bot.on(message('video'), async ctx => {
     const text = ctx.message.caption || filename
     const contentType = 'video/mp4'
 
-    await processTgFileId(ctx, ctx.message.video.file_id, filename, contentType, text)
+    await processTgFileIdAndReply(ctx, ctx.message.video.file_id, filename, contentType, text)
 });
 
 bot.on(message('audio'), async ctx => {
@@ -85,15 +88,34 @@ bot.on(message('audio'), async ctx => {
     const text = ctx.message.caption || filename
     const contentType = 'audio/mpeg'
 
-    await processTgFileId(ctx, ctx.message.audio.file_id, filename, contentType, text)
+    await processTgFileIdAndReply(ctx, ctx.message.audio.file_id, filename, contentType, text)
 });
 
 bot.on(message('voice'), async ctx => {
     const filename = 'Telegram Voice'
-    const text = ctx.message.caption || filename
     const contentType = ctx.message.voice.mime_type || 'audio/ogg'
+    const { uploaded, resp } = await saveTgFileById(ctx.message.voice.file_id, filename, contentType)
+    let text: string
 
-    await processTgFileId(ctx, ctx.message.voice.file_id, filename, contentType, text)
+    if (ctx.message.voice.duration <= 120) {
+        const prompt = `
+            This is a short personal note. It can contain an idea, a joke, or an important piece of information.
+    
+            Заметка может быть как на английском, так и на русском языке. Use the same language as in the audio.
+        `.trim()
+    
+    
+        text = await transcribe(Buffer.from(resp.data), prompt)
+    } else {
+        text = `Long Audio [${ctx.message.voice.duration} seconds]`
+    }
+
+    const postfix = getForwardedPostfix(ctx)
+
+    const { title } = await processTextAndFiles(postfix ? `${text} ${postfix}` : text, [uploaded])
+
+    ctx.reply(`Got it!\n\n${title}`)
+
 });
 
 bot.on(message('sticker'), async ctx => {
@@ -101,7 +123,7 @@ bot.on(message('sticker'), async ctx => {
     const text = filename
     const contentType = 'image/webp'
 
-    await processTgFileId(ctx, ctx.message.sticker.file_id, filename, contentType, text)
+    await processTgFileIdAndReply(ctx, ctx.message.sticker.file_id, filename, contentType, text)
 });
 
 bot.on(message('text'), async ctx => {

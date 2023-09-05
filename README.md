@@ -39,4 +39,5 @@ Note: Keep your url in secret!
 ## Roadmap
 
 - [x] Auto-set tags based on regexp from config
-- [ ] Upload files to S3, attach files to the page
+- [x] Upload files to S3, attach files to the page
+- [ ] Speech to text

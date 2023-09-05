@@ -23,6 +23,7 @@ provider:
           Resource: "arn:aws:s3:::${file(./config.yaml):S3_BUCKET}/*"
   environment:
     NOTION_TOKEN: ${file(./config.yaml):NOTION_TOKEN}
+    OPENAI_API_KEY: ${file(./config.yaml):OPENAI_API_KEY}
     ITEMS_DATABASE_ID: ${file(./config.yaml):ITEMS_DATABASE_ID}
     TAG_DATABASE_ID: ${file(./config.yaml):TAG_DATABASE_ID}
     S3_BUCKET: ${file(./config.yaml):S3_BUCKET}
